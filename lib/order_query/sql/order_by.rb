@@ -32,18 +32,33 @@ module OrderQuery
       end
 
       def column_clause_ray(col, reverse = false)
-        "#{col.column_name} #{sort_direction_sql(col, reverse)}".freeze
+        clauses = []
+        # TODO: use NULLS FIRST/LAST where supported.
+        clauses << order_by_nulls_sql(col, reverse) if needs_null_sort?(col)
+        clauses << "#{col.column_name} #{sort_direction_sql(col, reverse)}"
+        clauses.join(', ').freeze
       end
 
       def column_clause_enum(col, reverse = false)
         enum = col.order_enum
         # Collapse boolean enum to `ORDER BY column ASC|DESC`
-        if enum == [false, true] || enum == [true, false]
+        if !needs_null_sort?(col) && (enum == [false, true] || enum == [true, false])
           return column_clause_ray col, reverse ^ enum.last
         end
-        enum.map { |v|
+        clauses = []
+        clauses << order_by_nulls_sql(col, reverse) if needs_null_sort?(col)
+        clauses.concat enum.map { |v|
           "#{order_by_value_sql col, v} #{sort_direction_sql(col, reverse)}"
-        }.join(', ').freeze
+        }
+        clauses.join(', ').freeze
+      end
+
+      def needs_null_sort?(col)
+        col.nullable? && col.nulls != NullsDirection.default(col.direction)
+      end
+
+      def order_by_nulls_sql(col, reverse)
+        "#{col.column_name} IS #{'NOT ' if col.nulls(reverse) == :last}NULL #{sort_direction_sql(col, reverse)}"
       end
 
       def order_by_value_sql(col, v)

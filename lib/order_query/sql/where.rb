@@ -1,4 +1,3 @@
-# coding: utf-8
 module OrderQuery
   module SQL
     # Build where clause for searching around a record in an order space
@@ -93,23 +92,35 @@ module OrderQuery
       end
 
       def where_in(col, values)
-        case values.length
-          when 0
-            WHERE_IDENTITY
-          when 1
-            where_eq col, values[0]
-          else
-            ["#{col.column_name} IN (?)".freeze, [values]]
-        end
+        join_terms 'OR',
+                   (values.include?(nil) ? where_eq(col, nil) : WHERE_IDENTITY),
+                   case (non_nil_values = values - [nil]).length
+                     when 0
+                       WHERE_IDENTITY
+                     when 1
+                       where_eq col, non_nil_values
+                     else
+                       ["#{col.column_name} IN (?)".freeze, [non_nil_values]]
+                   end
       end
 
       def where_eq(col, value = point.value(col))
-        [%Q(#{col.column_name} = ?).freeze, [value]]
+        if value.nil?
+          ["#{col.column_name} IS NULL", []]
+        else
+          [%Q(#{col.column_name} = ?).freeze, [value]]
+        end
       end
 
       RAY_OP = {asc: '>'.freeze, desc: '<'.freeze}.freeze
+      NULLS_ORD = {first: 'IS NOT NULL', last: 'IS NULL'}
       def where_ray(col, from, mode, strict = true)
-        ["#{col.column_name} #{RAY_OP[col.direction(mode == :before)]}#{'=' unless strict} ?".freeze, [from]]
+        reverse = (mode == :before)
+        if from.nil?
+          ["#{col.column_name} #{NULLS_ORD[col.nulls_direction(reverse)]}", []]
+        else
+          ["#{col.column_name} #{RAY_OP[col.direction(reverse)]}#{'=' unless strict} ?".freeze, [from]]
+        end
       end
 
       WHERE_IDENTITY = [''.freeze, [].freeze].freeze

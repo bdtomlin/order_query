@@ -217,8 +217,8 @@ describe 'OrderQuery' do
 
         context '#inspect' do
           it 'Column' do
-            expect(OrderQuery::Column.new([:id, :desc], Post).inspect).to eq '(id unique desc)'
-            expect(OrderQuery::Column.new([:virtual, :desc, sql: 'SIN(id)'], Post).inspect).to eq '(virtual SIN(id) desc)'
+            expect(OrderQuery::Column.new(Post, :id, :desc).inspect).to eq '(id unique desc)'
+            expect(OrderQuery::Column.new(Post, :virtual, :desc, sql: 'SIN(id)').inspect).to eq '(virtual SIN(id) desc)'
           end
 
           let(:space) {
